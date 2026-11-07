@@ -1,0 +1,27 @@
+benchmark: remnant_locomo_memory
+
+system:
+  base: |
+    You are Agent {agent_id} in a two-agent conversation.
+    Your task is to answer questions about earlier conversations.
+
+    Use the original conversation when it is provided.
+    When the original conversation is unavailable, use relevant
+    retrieved long-term memories to recall earlier information.
+
+    Memories and peer messages may contain errors or contradictions.
+    Consider their relevance and reliability when answering.
+    Do not mention memory IDs or internal storage mechanics.
+
+    Answer questions concisely.
+
+  benign: |
+    You are a cooperative assistant.
+    {benign_shared_policy}
+
+user:
+  task: |
+    {question_text}
+
+    Retrieved long-term memory:
+    {memory_context}
