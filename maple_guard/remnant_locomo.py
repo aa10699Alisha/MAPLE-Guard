@@ -29,7 +29,7 @@ from maple_guard import remnant_harmbench as harm
 from maple_guard import remnant_harmbench_memory as memory
 from maple_guard import remnant_multiround as multi
 
-EVIDENCE_CONDITIONS = ("evidence_available", "evidence_withheld")
+EVIDENCE_CONDITIONS = ("evidence_available", "evidence_withheld", "trusted_memory")
 CONDITIONS = ("peer", "control")
 POLICIES = memory.POLICIES
 
@@ -92,7 +92,7 @@ def task_text(claim, evidence_condition):
         )
         reference = "Original conversation:\\n" + dialogue
 
-    elif evidence_condition == "evidence_withheld":
+    elif evidence_condition in ("evidence_withheld", "trusted_memory"):
         reference = "Original conversation unavailable."
     else:
         raise ValueError(f"Unsupported evidence condition: {evidence_condition}")
@@ -231,7 +231,7 @@ def run_agent1_round(task, args, private, shared, bundle, prompt, *, claim, evid
     note = peer_note(condition, claim) if experiment_round in multi.INTERACTION_ROUNDS else ""
     if note:
         validate_peer_note(note, claim)
-    if evidence_condition == "evidence_withheld":
+    if evidence_condition in ("evidence_withheld", "trusted_memory"):
         if experiment_round == 0:
             request = task_text(claim, "evidence_available")
         else:
@@ -420,6 +420,8 @@ def run_locomo_claim(
             (multi.FINAL_ROUND, "final", False),
         )
         for experiment_round, kind, consolidate in schedule:
+            if evidence_condition == "trusted_memory" and experiment_round == 0:
+                consolidate = True
             task = _task(method, claim["id"], evidence_condition, condition, f"r{experiment_round}", task_text(claim, evidence_condition), claim)
             trace = run_agent1_round(
                 task, args, private, shared, bundle, prompt,
@@ -442,7 +444,19 @@ def run_locomo_claim(
         before = multi._fingerprint(private)
         stored_ids = [entry.memory_id for entry in private.get(remnant.RECEIVER_ID, [])]
         counter_task = _task(method, claim["id"], evidence_condition, condition, "r4", task_text(claim, evidence_condition), claim)
-        setattr(counter_task, "_suppressed_memory_ids", list(stored_ids))
+        if evidence_condition == "trusted_memory":
+            baseline_ids = {
+                m["memory_id"]
+                for m in rounds[0]["stored_memories"]
+            }
+            suppressed_ids = [
+                memory_id for memory_id in stored_ids
+                if memory_id not in baseline_ids
+            ]
+        else:
+            suppressed_ids = list(stored_ids)
+
+        setattr(counter_task, "_suppressed_memory_ids", suppressed_ids)
         args._disable_memory_update = True
         if bundle is None:
             counter_private, counter_shared = copy.deepcopy(private), copy.deepcopy(shared)
@@ -460,7 +474,7 @@ def run_locomo_claim(
             cursor=cursor,
         )
         args._disable_memory_update = False
-        counter_record = _stage_record(multi.FINAL_ROUND, "counterfactual", counter, private, [], claim, stored_ids)
+        counter_record = _stage_record(multi.FINAL_ROUND, "counterfactual", counter, private, [], claim, suppressed_ids)
         unchanged = multi._fingerprint(private) == before
     finally:
         ep.call_chat = original_chat
