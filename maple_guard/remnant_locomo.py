@@ -101,7 +101,7 @@ def task_text(claim, evidence_condition):
         reference
         + "\\n\\nQuestion: "
         + question
-        + "\\nAnswer with only the book title."
+        + "\\nAnswer the question concisely. If the answer is unknown, say so."
     )
 
 
@@ -235,7 +235,7 @@ def run_agent1_round(task, args, private, shared, bundle, prompt, *, claim, evid
         if experiment_round == 0:
             request = task_text(claim, "evidence_available")
         else:
-            request = "Question: " + claim["question"] + "\nAnswer with only the book title."
+            request = "Question: " + claim["question"] + "\nAnswer the question concisely. If the answer is unknown, say so."
     else:
         request = task_text(claim, evidence_condition)
     memory_context = ep.render_memory_context(selected_by_agent.get(remnant.RECEIVER_ID, []), args.method)
